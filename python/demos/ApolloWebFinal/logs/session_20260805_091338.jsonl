@@ -1,0 +1,2 @@
+{"seq": 1, "ts": "2026-08-05T09:13:38.501", "type": "server_start", "data": {"mission_file": "//DESKTOP-E4EV1D8/Apollo/missionTiming.json", "agc_file": "//DESKTOP-E4EV1D8/Apollo/outputAGC.json", "lgc_file": "//DESKTOP-E4EV1D8/Apollo/outputLGC.json", "destinazione_udp": "192.168.1.105:8051", "log_file": "logs\\session_20260805_091338.jsonl"}}
+{"seq": 2, "ts": "2026-08-05T09:13:42.000", "type": "mission_event", "data": {"id": 1, "category": "SISTEMA", "description": "Registro eventi inizializzato", "details": "", "met": "+000:00:00", "wallClock": "09:13:42"}}

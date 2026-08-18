@@ -1,0 +1,13 @@
+{"seq": 1, "ts": "2026-08-06T18:10:03.446", "type": "server_start", "data": {"mission_file": "//DESKTOP-E4EV1D8/Apollo/missionTiming.json", "agc_file": "//DESKTOP-E4EV1D8/Apollo/outputAGC.json", "lgc_file": "//DESKTOP-E4EV1D8/Apollo/outputLGC.json", "destinazione_udp": "192.168.1.103:8051", "log_file": "logs\\session_20260806_181003.jsonl"}}
+{"seq": 2, "ts": "2026-08-06T18:10:12.126", "type": "mission_event", "data": {"id": 1, "category": "SISTEMA", "description": "Registro eventi inizializzato", "details": "", "met": "+000:00:00", "wallClock": "18:10:12"}}
+{"seq": 3, "ts": "2026-08-06T18:10:12.177", "type": "mission_event", "data": {"id": 2, "category": "RENDEZVOUS", "description": "P79 avviato — avvicinamento finale", "details": "MET=+072:56:24, Programma=79", "met": "+072:56:24", "wallClock": "18:10:12"}}
+{"seq": 4, "ts": "2026-08-06T18:11:26.968", "type": "macro_step", "data": {"macro": "sys2", "line": "--- INIZIO PROCEDURA AUTOMATICA POST-DOCKING ---"}}
+{"seq": 5, "ts": "2026-08-06T18:11:27.002", "type": "macro_step", "data": {"macro": "sys2", "line": "⚙️ Retracting Scopes (Retract -> UP)"}}
+{"seq": 6, "ts": "2026-08-06T18:11:27.120", "type": "switch_sent", "data": {"switch_id": 238, "position": 4}}
+{"seq": 7, "ts": "2026-08-06T18:11:27.646", "type": "macro_step", "data": {"macro": "sys2", "line": "💡 Retract Docking Probe (DockingProbe -> Down)"}}
+{"seq": 8, "ts": "2026-08-06T18:11:27.770", "type": "switch_sent", "data": {"switch_id": 237, "position": 5}}
+{"seq": 9, "ts": "2026-08-06T18:11:27.786", "type": "macro_step", "data": {"macro": "sys2", "line": "💡 Spegnimento luci Rendezvous (ExtLightRNDZ -> Middle)"}}
+{"seq": 10, "ts": "2026-08-06T18:11:27.903", "type": "switch_sent", "data": {"switch_id": 241, "position": 2}}
+{"seq": 11, "ts": "2026-08-06T18:11:27.919", "type": "macro_step", "data": {"macro": "sys2", "line": "💡 Attivazione luci Rendezvous (ExtLightRUNEVA -> UP)"}}
+{"seq": 12, "ts": "2026-08-06T18:11:28.036", "type": "switch_sent", "data": {"switch_id": 240, "position": 5}}
+{"seq": 13, "ts": "2026-08-06T18:11:28.053", "type": "macro_step", "data": {"macro": "sys2", "line": "--- OPERAZIONE COMPLETATA CON SUCCESSO ---"}}

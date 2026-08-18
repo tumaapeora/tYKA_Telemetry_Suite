@@ -1,0 +1,1 @@
+{"seq": 1, "ts": "2026-08-12T19:28:36.319", "type": "server_start", "data": {"mission_file": "//DESKTOP-E4EV1D8/Apollo/missionTiming.json", "agc_file": "//DESKTOP-E4EV1D8/Apollo/outputAGC.json", "lgc_file": "//DESKTOP-E4EV1D8/Apollo/outputLGC.json", "destinazione_udp": "192.168.1.103:8051", "log_file": "logs\\session_20260812_192836.jsonl"}}

@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Apollo Flight Operations Workspace</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="topbar">
+  <span class="topbar-title" id="page-title">CONSOLE PRINCIPALE DI CONTROLLO MISSIONE</span>
+  <span class="topbar-status">STATO SISTEMA: COLLEGATO &nbsp;&middot;&nbsp; UDP &rarr; {{ dest_ip }}:{{ dest_port }}</span>
+</header>
+
+<main id="app">
+
+  {% macro dsky_display(prefix, title, css_class) %}
+  <div class="panel dsky-panel {{ css_class }}">
+    <div class="plate"><span class="plate-text">{{ title }}</span></div>
+    <div class="display-box">
+      <div class="dsky-top">
+        <div class="dsky-col"><span class="tiny dim">PROG</span><span class="big" id="{{ prefix }}-prog">00</span></div>
+        <div class="dsky-col"><span class="tiny dim">VERB</span><span class="big" id="{{ prefix }}-verb">00</span></div>
+        <div class="dsky-col"><span class="tiny dim">NOUN</span><span class="big" id="{{ prefix }}-noun">00</span></div>
+      </div>
+      <div class="separator"></div>
+      <div class="regs">
+        <div class="reg-row"><span class="tiny dim reg-label">R1</span><span class="big reg-value" id="{{ prefix }}-reg-1">+00000</span></div>
+        <div class="reg-row"><span class="tiny dim reg-label">R2</span><span class="big reg-value" id="{{ prefix }}-reg-2">+00000</span></div>
+        <div class="reg-row"><span class="tiny dim reg-label">R3</span><span class="big reg-value" id="{{ prefix }}-reg-3">+00000</span></div>
+      </div>
+    </div>
+    <div class="ind-shell">
+      <div class="ind-grid" id="{{ prefix }}-indicators">
+        {% for name in indicators %}
+        <div class="indicator {{ 'red' if name in red_indicators else '' }}" data-name="{{ name }}">{{ name.upper() }}</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endmacro %}
+
+  {% macro maneuver_panel(prefix, title, allow_craft, show_engine=true) %}
+  <div class="panel burn-panel">
+    <div class="plate"><span class="plate-text accent">{{ title }}</span></div>
+    <div class="burn-type-row" id="{{ prefix }}-type-select"></div>
+    {% if allow_craft %}
+    <div class="orbit-switch-row burn-craft-row" id="{{ prefix }}-craft-select">
+      <button class="key-btn burn-craft-btn active" data-craft="agc">OSSERVA SU AGC (CSM)</button>
+      <button class="key-btn burn-craft-btn" data-craft="lgc">OSSERVA SU LGC (LM)</button>
+    </div>
+    {% endif %}
+    <div class="display-box burn-display">
+      <div class="tiny accent" id="{{ prefix }}-display-label">In attesa di dati...</div>
+      <div class="regs" style="margin-top:8px;">
+        <div class="reg-row"><span class="tiny dim reg-label-wide" id="{{ prefix }}-r1-label">—</span><span class="big reg-value" id="{{ prefix }}-r1-val">--</span></div>
+        <div class="reg-row"><span class="tiny dim reg-label-wide" id="{{ prefix }}-r2-label">—</span><span class="big reg-value" id="{{ prefix }}-r2-val">--</span></div>
+        <div class="reg-row"><span class="tiny dim reg-label-wide" id="{{ prefix }}-r3-label">—</span><span class="big reg-value" id="{{ prefix }}-r3-val">--</span></div>
+      </div>
+    </div>
+    <div class="burn-status-row">
+      {% if show_engine %}
+      <div class="ind-shell burn-status-item">
+        <span class="tiny dim">MOTORE</span>
+        <div class="indicator burn-engine-light" id="{{ prefix }}-engine-light">MOTORE</div>
+        <span class="tiny" id="{{ prefix }}-engine-status">SPENTO</span>
+      </div>
+      {% else %}
+      <div class="ind-shell burn-status-item">
+        <span class="tiny dim">STATO SPINTA RCS</span>
+        <span class="big orbit-info-val" id="{{ prefix }}-engine-status">IN ATTESA</span>
+      </div>
+      {% endif %}
+      <div class="ind-shell burn-status-item">
+        <span class="tiny dim">ΔV PIANIFICATO</span>
+        <span class="big orbit-info-val" id="{{ prefix }}-dv-planned">--</span>
+      </div>
+      <div class="ind-shell burn-status-item">
+        <span class="tiny dim">ΔV EFFETTIVO</span>
+        <span class="big orbit-info-val" id="{{ prefix }}-dv-actual">--</span>
+      </div>
+      <div class="ind-shell burn-status-item">
+        <span class="tiny dim">DURATA ACCENSIONE</span>
+        <span class="big orbit-info-val" id="{{ prefix }}-duration">--</span>
+      </div>
+      <button class="key-btn" id="{{ prefix }}-reset-btn">RESET MANOVRA SELEZIONATA</button>
+    </div>
+    <div class="burn-log-wrap">
+      <span class="tiny accent">REGISTRO MANOVRE COMPLETATE</span>
+      <table class="burn-log-table">
+        <thead><tr><th>Manovra</th><th>MET</th><th>ΔV pian.</th><th>ΔV eff.</th><th>Durata (s)</th></tr></thead>
+        <tbody id="{{ prefix }}-log-body"></tbody>
+      </table>
+    </div>
+  </div>
+  {% endmacro %}
+
+  <!-- ================= MENU PRINCIPALE: SCELTA CATEGORIA ================= -->
+  <section class="page" id="page-menu" data-title="CONSOLE PRINCIPALE DI CONTROLLO MISSIONE">
+    <div class="panel menu-panel">
+      <div class="plate"><span class="plate-text accent">SELEZIONA LA CATEGORIA DELLA CONSOLE</span></div>
+      <button class="key-btn wide category-btn" data-page="page-cat-mc">[ A ]&nbsp; CONTROLLO MISSIONE — TELEMETRIA E MONITORAGGIO</button>
+      <button class="key-btn wide category-btn" data-page="page-cat-ops">[ B ]&nbsp; OPERAZIONI — DSKY INTERATTIVO E SEQUENZE AUTOMATICHE</button>
+    </div>
+  </section>
+
+  <!-- ================= SOTTOMENU: CONTROLLO MISSIONE ================= -->
+  <section class="page hidden" id="page-cat-mc" data-title="CONTROLLO MISSIONE — TELEMETRIA E MONITORAGGIO">
+    <div class="panel menu-panel">
+      <div class="plate"><span class="plate-text accent">SELEZIONA MODALITÀ DI TELEMETRIA</span></div>
+      <button class="key-btn wide" data-page="page-view">[ MC-1 ]&nbsp; PANNELLO COMPUTER — AGC &amp; LGC (SOLA LETTURA)</button>
+      <button class="key-btn wide" data-page="page-orbit">[ MC-2 ]&nbsp; MAPPA ORBITALE — V82E APOGEO/PERIGEO</button>
+      <button class="key-btn wide" data-page="page-launch">[ MC-3 ]&nbsp; FASE DI LANCIO (DALLA TERRA)</button>
+      <button class="key-btn wide" data-page="page-burns">[ MC-4 ]&nbsp; BURN TRANS-STADIO — TLI / MANOVRE P30-P40</button>
+      <button class="key-btn wide" data-page="page-descent">[ MC-5 ]&nbsp; DISCESA LUNARE DEL LM — P63/P64/P66</button>
+      <button class="key-btn wide" data-page="page-ascent">[ MC-6 ]&nbsp; RISALITA LUNARE E RENDEZVOUS</button>
+      <button class="key-btn wide" data-page="page-reentry">[ MC-7 ]&nbsp; RIENTRO ATMOSFERICO — P61-P67</button>
+      <button class="key-btn wide" data-page="page-log">[ MC-8 ]&nbsp; REGISTRO EVENTI DI MISSIONE</button>
+      <button class="back-btn wide-back" data-page="page-menu">&#9668; INDIETRO ALLA SELEZIONE CATEGORIA</button>
+    </div>
+  </section>
+
+  <!-- ================= SOTTOMENU: OPERAZIONI ================= -->
+  <section class="page hidden" id="page-cat-ops" data-title="OPERAZIONI — DSKY INTERATTIVO E SEQUENZE AUTOMATICHE">
+    <div class="panel menu-panel">
+      <div class="plate"><span class="plate-text accent">SELEZIONA MODALITÀ OPERATIVA</span></div>
+      <button class="key-btn wide" data-page="page-agc">[ OP-1 ]&nbsp; ACCESSO DSKY INTERATTIVO — AGC</button>
+      <button class="key-btn wide" data-page="page-lgc">[ OP-2 ]&nbsp; ACCESSO DSKY INTERATTIVO — LGC</button>
+      <button class="key-btn wide" data-page="page-rndz">[ OP-3 ]&nbsp; AVVIA SEQUENZA AUTOMATICA DI RENDEZ-VOUS</button>
+      <button class="key-btn wide" data-page="page-sys2">[ OP-4 ]&nbsp; AVVIA CONFIGURAZIONE AUTOMATICA POST-DOCKING</button>
+      <button class="back-btn wide-back" data-page="page-menu">&#9668; INDIETRO ALLA SELEZIONE CATEGORIA</button>
+    </div>
+  </section>
+
+  <!-- ================= MC-1: PANNELLO COMPUTER AGC + LGC (SOLA LETTURA) ================= -->
+  <section class="page hidden" id="page-view" data-title="PANNELLO COMPUTER — TELEMETRIA AGC &amp; LGC">
+    <div class="met-shell panel">
+      <div class="display-box met-box">
+        <span class="tiny dim">TEMPO MISSIONE TRASCORSO (MET)</span>
+        <span class="met-value" id="met-value-view">+000:00:00</span>
+      </div>
+    </div>
+    <div class="top-bar">
+      <span class="tiny accent">SOLA LETTURA — NESSUN COMANDO INVIATO</span>
+      <button class="back-btn" data-page="page-cat-mc">&#9668; INDIETRO A CONTROLLO MISSIONE</button>
+    </div>
+    <div class="monitor-body">
+      {{ dsky_display("view-agc", "AGC — COMMAND MODULE (SOLA LETTURA)", "") }}
+      {{ dsky_display("view-lgc", "LGC — LUNAR MODULE (SOLA LETTURA)", "lgc-theme") }}
+    </div>
+  </section>
+
+  <!-- ================= OP-1: AGC DSKY INTERATTIVO ================= -->
+  <section class="page hidden" id="page-agc" data-title="DISPLAY DI SISTEMA — AGC COMMAND MODULE">
+    <div class="met-shell panel">
+      <div class="display-box met-box">
+        <span class="tiny dim">TEMPO MISSIONE TRASCORSO (MET)</span>
+        <span class="met-value" id="met-value-agc">+000:00:00</span>
+      </div>
+    </div>
+    <div class="agc-body">
+      {{ dsky_display("agc", "PANNELLO AGC — MATRICE DATI DETTAGLIATA", "") }}
+      <div class="right-side">
+        <div class="top-bar">
+          <span class="tiny accent">INSERIMENTO DA TASTIERA — AGC</span>
+          <button class="back-btn" data-page="page-cat-ops">&#9668; INDIETRO A OPERAZIONI</button>
+        </div>
+        <div class="panel keypad-panel">
+          <div class="keypad-grid" id="keypad-agc" data-target="agc">
+            <button class="key-btn span2" data-key="VERB">VERB</button>
+            <button class="key-btn span2" data-key="NOUN">NOUN</button>
+            <button class="key-btn" data-key="+">+</button>
+            <button class="key-btn" data-key="-">-</button>
+            <button class="key-btn" data-key="7">7</button>
+            <button class="key-btn" data-key="8">8</button>
+            <button class="key-btn" data-key="9">9</button>
+            <button class="key-btn" data-key="4">4</button>
+            <button class="key-btn" data-key="5">5</button>
+            <button class="key-btn" data-key="6">6</button>
+            <button class="key-btn" data-key="1">1</button>
+            <button class="key-btn" data-key="2">2</button>
+            <button class="key-btn" data-key="3">3</button>
+            <button class="key-btn" data-key="0">0</button>
+            <button class="key-btn" data-key="CLR">CLR</button>
+            <button class="key-btn" data-key="PRO">PRO</button>
+            <button class="key-btn span2" data-key="KEY REL">KEY REL</button>
+            <button class="key-btn span2" data-key="ENTR">ENTR</button>
+            <button class="key-btn span2" data-key="RSET">RSET</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="status-bar" id="agc-status">STANDBY — NESSUN COMANDO INVIATO</div>
+  </section>
+
+  <!-- ================= OP-2: LGC DSKY INTERATTIVO ================= -->
+  <section class="page hidden" id="page-lgc" data-title="DISPLAY DI SISTEMA — LGC LUNAR MODULE">
+    <div class="met-shell panel">
+      <div class="display-box met-box">
+        <span class="tiny dim">TEMPO MISSIONE TRASCORSO (MET)</span>
+        <span class="met-value" id="met-value-lgc">+000:00:00</span>
+      </div>
+    </div>
+    <div class="agc-body">
+      {{ dsky_display("lgc", "PANNELLO LGC — MATRICE DATI DETTAGLIATA", "lgc-theme") }}
+      <div class="right-side">
+        <div class="top-bar">
+          <span class="tiny accent">INSERIMENTO DA TASTIERA — LGC</span>
+          <button class="back-btn" data-page="page-cat-ops">&#9668; INDIETRO A OPERAZIONI</button>
+        </div>
+        <div class="panel keypad-panel">
+          <div class="keypad-grid" id="keypad-lgc" data-target="lgc">
+            <button class="key-btn span2" data-key="VERB">VERB</button>
+            <button class="key-btn span2" data-key="NOUN">NOUN</button>
+            <button class="key-btn" data-key="+">+</button>
+            <button class="key-btn" data-key="-">-</button>
+            <button class="key-btn" data-key="7">7</button>
+            <button class="key-btn" data-key="8">8</button>
+            <button class="key-btn" data-key="9">9</button>
+            <button class="key-btn" data-key="4">4</button>
+            <button class="key-btn" data-key="5">5</button>
+            <button class="key-btn" data-key="6">6</button>
+            <button class="key-btn" data-key="1">1</button>
+            <button class="key-btn" data-key="2">2</button>
+            <button class="key-btn" data-key="3">3</button>
+            <button class="key-btn" data-key="0">0</button>
+            <button class="key-btn" data-key="CLR">CLR</button>
+            <button class="key-btn" data-key="PRO">PRO</button>
+            <button class="key-btn span2" data-key="KEY REL">KEY REL</button>
+            <button class="key-btn span2" data-key="ENTR">ENTR</button>
+            <button class="key-btn span2" data-key="RSET">RSET</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="status-bar" id="lgc-status">STANDBY — NESSUN COMANDO INVIATO</div>
+  </section>
+
+  <!-- ================= OP-3: RENDEZ-VOUS ================= -->
+  <section class="page hidden" id="page-rndz" data-title="OPERAZIONI AUTOMATICHE — CONTROLLO COMPUTER RENDEZ-VOUS">
+    <div class="panel macro-panel">
+      <div class="top-bar">
+        <span class="plate-text accent">GESTIONE AUTOMATICA RENDEZ-VOUS ORBITALE</span>
+        <button class="back-btn" data-page="page-cat-ops">&#9668; INDIETRO A OPERAZIONI</button>
+      </div>
+      <div class="orbit-switch-group">
+        <span class="tiny dim orbit-switch-label">VEICOLO BERSAGLIO DEL RENDEZ-VOUS</span>
+        <div class="orbit-switch-row" id="rndz-target-select">
+          <button class="key-btn rndz-target-btn active" data-target="lm">CSM-LM</button>
+          <button class="key-btn rndz-target-btn" data-target="skylab">CSM-SKYLAB</button>
+        </div>
+      </div>
+      <p class="tiny dim" id="rndz-target-note">Procedura standard (nessun passo aggiuntivo sul AGC).</p>
+      <div class="display-box terminal" id="rndz-log">[SISTEMA PRONTO] - IN ATTESA DI ATTIVAZIONE</div>
+      <button class="fire-btn" id="rndz-fire">&#9889; ESEGUI CONFIGURAZIONE AUTOMATICA RENDEZ-VOUS</button>
+    </div>
+  </section>
+
+  <!-- ================= OP-4: SYS2 (POST-DOCKING) ================= -->
+  <section class="page hidden" id="page-sys2" data-title="OPERAZIONI AUTOMATICHE — AUTO-CONFIG SPS E LOGISTICA">
+    <div class="panel macro-panel">
+      <div class="top-bar">
+        <span class="plate-text accent">RETRAZIONE SONDA DI DOCKING</span>
+        <button class="back-btn" data-page="page-cat-ops">&#9668; INDIETRO A OPERAZIONI</button>
+      </div>
+      <div class="display-box terminal" id="sys2-log">[SISTEMA PRONTO] - IN ATTESA DI ATTIVAZIONE</div>
+      <button class="fire-btn" id="sys2-fire">&#9889; AUTO-CONFIG POST-DOCKING</button>
+    </div>
+  </section>
+
+  <!-- ================= MC-2: MAPPA ORBITALE ================= -->
+  <section class="page hidden" id="page-orbit" data-title="MAPPA ORBITALE — V82E APOGEO/PERIGEO (SCHEMATICA)">
+    <div class="panel orbit-panel">
+      <div class="top-bar">
+        <span class="plate-text accent">RICOSTRUZIONE ORBITALE DA V82E (APOGEO/PERIGEO)</span>
+        <button class="back-btn" data-page="page-cat-mc">&#9668; INDIETRO A CONTROLLO MISSIONE</button>
+      </div>
+
+      <p class="orbit-note">
+        Premi <strong>V82E</strong> sul DSKY (AGC o LGC): R1 = Apogeo, R2 = Perigeo, in nmi
+        (l'ultima cifra è un decimale: 5 cifre → XXXX.X). L'AGC del CSM è valido sia in
+        orbita terrestre che lunare — scegli tu il corpo. La posizione reale lungo
+        l'orbita non è nota: imposta una fase iniziale (0°=periastro, 180°=apoastro) e
+        l'animazione seguirà da lì il periodo orbitale calcolato esattamente.
+      </p>
+
+      <div class="orbit-source-select">
+        <div class="orbit-switch-group">
+          <span class="tiny dim orbit-switch-label">STATO AGGANCIO</span>
+          <div class="orbit-switch-row">
+            <button class="key-btn orbit-dock-btn active" data-dock="docked">AGGANCIATI (CSM+LM STESSA ORBITA)</button>
+            <button class="key-btn orbit-dock-btn" data-dock="undocked">SGANCIATI (ORBITE INDIPENDENTI)</button>
+          </div>
+        </div>
+        <div class="orbit-switch-group">
+          <span class="tiny dim orbit-switch-label">CORPO CELESTE ORBITATO</span>
+          <div class="orbit-switch-row">
+            <button class="key-btn orbit-body-btn active" data-body="earth">TERRA</button>
+            <button class="key-btn orbit-body-btn" data-body="moon">LUNA</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Blocco AGGANCIATI -->
+      <div class="orbit-craft-block" id="orbit-craft-docked">
+        <div class="orbit-form">
+          <label class="orbit-field"><span class="tiny dim">APOGEO (nmi)</span><input type="number" id="orbit-d-apogee" step="0.1" placeholder="es. 103.5"></label>
+          <label class="orbit-field"><span class="tiny dim">PERIGEO (nmi)</span><input type="number" id="orbit-d-perigee" step="0.1" placeholder="es. 98.2"></label>
+          <label class="orbit-field"><span class="tiny dim">FASE INIZIALE (°)</span><input type="number" id="orbit-d-phase" min="0" max="360" value="0"></label>
+          <button class="key-btn" id="orbit-d-fill-agc-btn">COMPILA DA AGC</button>
+          <button class="key-btn" id="orbit-d-fill-lgc-btn">COMPILA DA LGC</button>
+        </div>
+      </div>
+
+      <!-- Blocco SGANCIATI -->
+      <div class="orbit-craft-block hidden" id="orbit-craft-undocked">
+        <div class="orbit-form">
+          <span class="tiny accent orbit-craft-tag">CSM (AGC)</span>
+          <label class="orbit-field"><span class="tiny dim">APOGEO (nmi)</span><input type="number" id="orbit-u-csm-apogee" step="0.1"></label>
+          <label class="orbit-field"><span class="tiny dim">PERIGEO (nmi)</span><input type="number" id="orbit-u-csm-perigee" step="0.1"></label>
+          <label class="orbit-field"><span class="tiny dim">FASE (°)</span><input type="number" id="orbit-u-csm-phase" min="0" max="360" value="0"></label>
+          <button class="key-btn" id="orbit-u-csm-fill-btn">COMPILA DA AGC</button>
+        </div>
+        <div class="orbit-form">
+          <span class="tiny orbit-craft-tag lgc-text">LM (LGC)</span>
+          <label class="orbit-field"><span class="tiny dim">APOGEO (nmi)</span><input type="number" id="orbit-u-lm-apogee" step="0.1"></label>
+          <label class="orbit-field"><span class="tiny dim">PERIGEO (nmi)</span><input type="number" id="orbit-u-lm-perigee" step="0.1"></label>
+          <label class="orbit-field"><span class="tiny dim">FASE (°)</span><input type="number" id="orbit-u-lm-phase" min="0" max="360" value="0"></label>
+          <button class="key-btn" id="orbit-u-lm-fill-btn">COMPILA DA LGC</button>
+          <button class="key-btn" id="orbit-lm-landed-btn">SEGNA LM SULLA SUPERFICIE LUNARE</button>
+        </div>
+      </div>
+
+      <div class="orbit-form">
+        <button class="fire-btn orbit-draw-btn" id="orbit-draw-btn">&#9889; DISEGNA ORBITA/E</button>
+      </div>
+      <div class="status-bar" id="orbit-status"></div>
+
+      <div class="orbit-layout">
+        <div class="display-box orbit-svg-wrap">
+          <svg id="orbit-svg" viewBox="0 0 600 420" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+
+        <div class="orbit-side">
+          <div class="ind-shell orbit-info" id="orbit-info-docked">
+            <div class="orbit-info-row"><span class="tiny dim">CORPO</span><span class="big orbit-info-val" id="orbit-d-body">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">SEMIASSE MAGGIORE</span><span class="big orbit-info-val" id="orbit-d-sma">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">ECCENTRICITÀ</span><span class="big orbit-info-val" id="orbit-d-ecc">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">PERIODO</span><span class="big orbit-info-val" id="orbit-d-period">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">TEMPO SIMULATO</span><span class="big orbit-info-val" id="orbit-d-simtime">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">TEMPO AL PERIGEO</span><span class="big orbit-info-val" id="orbit-d-ttperi">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">TEMPO ALL'APOGEO</span><span class="big orbit-info-val" id="orbit-d-ttapo">--</span></div>
+          </div>
+
+          <div class="ind-shell orbit-info hidden" id="orbit-info-undocked">
+            <div class="tiny accent" style="margin-bottom:4px;">CSM</div>
+            <div class="orbit-info-row"><span class="tiny dim">SEMIASSE</span><span class="big orbit-info-val" id="orbit-u-csm-sma">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">ECC.</span><span class="big orbit-info-val" id="orbit-u-csm-ecc">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">PERIODO</span><span class="big orbit-info-val" id="orbit-u-csm-period">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">SIMULATO</span><span class="big orbit-info-val" id="orbit-u-csm-simtime">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">A PERIGEO</span><span class="big orbit-info-val" id="orbit-u-csm-ttperi">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">AD APOGEO</span><span class="big orbit-info-val" id="orbit-u-csm-ttapo">--</span></div>
+            <div class="tiny lgc-text" style="margin:8px 0 4px;">LM</div>
+            <div class="orbit-info-row"><span class="tiny dim">SEMIASSE</span><span class="big orbit-info-val" id="orbit-u-lm-sma">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">ECC.</span><span class="big orbit-info-val" id="orbit-u-lm-ecc">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">PERIODO</span><span class="big orbit-info-val" id="orbit-u-lm-period">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">SIMULATO</span><span class="big orbit-info-val" id="orbit-u-lm-simtime">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">A PERIGEO</span><span class="big orbit-info-val" id="orbit-u-lm-ttperi">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">AD APOGEO</span><span class="big orbit-info-val" id="orbit-u-lm-ttapo">--</span></div>
+          </div>
+
+          <div class="orbit-controls">
+            <label class="tiny dim">ACCELERAZIONE (sec simulati / sec reale)</label>
+            <input type="number" id="orbit-accel" value="200" min="0.1" step="1">
+            <button class="key-btn" id="orbit-play-btn">&#9208; PAUSA</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MC-3: FASE DI LANCIO ================= -->
+  <section class="page hidden" id="page-launch" data-title="FASE DI LANCIO (DALLA TERRA)">
+    <div class="panel launch-panel">
+      <div class="top-bar">
+        <span class="plate-text accent">MONITORAGGIO LANCIO E SALITA</span>
+        <button class="back-btn" data-page="page-cat-mc">&#9668; INDIETRO A CONTROLLO MISSIONE</button>
+      </div>
+
+      <p class="orbit-note">
+        Luci di sequenza semplificate per P01/P02 (basate sul programma AGC attivo — la
+        telemetria non espone i singoli passi interni al programma). Il monitoraggio
+        P11 (V06N62) si attiva automaticamente al liftoff o al comando manuale di
+        backup V75E. Il richiamo V82E (V16N44) è disponibile in qualsiasi momento.
+      </p>
+
+      <div class="descent-status-row">
+        <div class="ind-shell descent-status-item">
+          <span class="tiny dim">SEQUENZA PRELANCIO</span>
+          <div class="launch-seq-lights">
+            <div class="indicator launch-seq-light" id="launch-light-p01">P01</div>
+            <div class="indicator launch-seq-light" id="launch-light-p02">P02</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel dsky-panel" style="margin-top:10px;">
+        <div class="plate"><span class="plate-text">P11 — LIFTOFF (V06N62, NON LAMPEGGIANTE)</span></div>
+        <div class="display-box">
+          <div class="tiny accent" id="launch-p11-status">IN ATTESA DI V06N62 (LIFTOFF / V75E)</div>
+          <div class="regs" style="margin-top:8px;">
+            <div class="reg-row"><span class="tiny dim reg-label-wide">MAGNITUDO VELOCITÀ INERZIALE (ft/s)</span><span class="big reg-value" id="launch-p11-r1">--</span></div>
+            <div class="reg-row"><span class="tiny dim reg-label-wide">RATEO ALTEZZA / VELOCITÀ VERTICALE (ft/s)</span><span class="big reg-value" id="launch-p11-r2">--</span></div>
+            <div class="reg-row"><span class="tiny dim reg-label-wide">ALTEZZA SOPRA RAGGIO PAD (nmi)</span><span class="big reg-value" id="launch-p11-r3">--</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel dsky-panel" style="margin-top:10px;">
+        <div class="plate"><span class="plate-text">PARAMETRI ORBITALI (V82E → V16N44, LAMPEGGIANTE)</span></div>
+        <div class="display-box">
+          <div class="tiny accent" id="launch-v82-status">RICHIAMABILE MANUALMENTE (V82E)</div>
+          <div class="regs" style="margin-top:8px;">
+            <div class="reg-row"><span class="tiny dim reg-label-wide">ALTEZZA APOGEO</span><span class="big reg-value" id="launch-v82-apogee">--</span></div>
+            <div class="reg-row"><span class="tiny dim reg-label-wide">ALTEZZA PERIGEO</span><span class="big reg-value" id="launch-v82-perigee">--</span></div>
+            <div class="reg-row"><span class="tiny dim reg-label-wide">TEMPO A CADUTA LIBERA (TFF, MM:SS)</span><span class="big reg-value" id="launch-v82-tff">--:--</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MC-4: BURN TRANS-STADIO ================= -->
+  <section class="page hidden" id="page-burns" data-title="BURN TRANS-STADIO — TLI / MANOVRE P30-P40">
+    <div class="top-bar" style="max-width:1040px;margin:12px auto 0;">
+      <span class="plate-text accent">CONTROLLO BURN TRANS-STADIO</span>
+      <button class="back-btn" data-page="page-cat-mc">&#9668; INDIETRO A CONTROLLO MISSIONE</button>
+    </div>
+    <p class="orbit-note" style="max-width:1040px;margin:8px auto;">
+      Seleziona la manovra da osservare. Il rilevamento del Noun attivo, la spia
+      motore ON/OFF (basata sulla variazione dei registri) e la cattura ΔV
+      pianificato/effettivo sono automatici e condivisi dalla stessa architettura
+      logica per tutte le manovre. Le schede P30/P40 sono personalizzabili — usa
+      ✎ per rinominarle (LOI-1, LOI-2, TEI, Circ, RNDZ...), ✕ per rimuoverle o
+      "+ NUOVA MANOVRA" per aggiungerne altre, a seconda del profilo di missione
+      (lunare o in orbita terrestre). TLI (P15) resta una scheda fissa, perché
+      usa un Verb/Noun diverso dalle altre.
+    </p>
+    {{ maneuver_panel("burn", "MONITOR MANOVRA — TLI / P30-P40", false) }}
+  </section>
+
+  <!-- ================= MC-5: LM DESCENT TELEMETRY ================= -->
+  <section class="page hidden" id="page-descent" data-title="DISCESA LUNARE DEL LM — P63/P64/P66">
+    <div class="panel descent-panel">
+      <div class="top-bar">
+        <span class="plate-text accent">DISCESA LUNARE — MONITOR AUTOMATICO P63/P64/P66</span>
+        <button class="back-btn" data-page="page-cat-mc">&#9668; INDIETRO A CONTROLLO MISSIONE</button>
+      </div>
+
+      <p class="orbit-note">
+        Riconoscimento automatico dal Verb/Noun mostrato sul DSKY LGC. Il cronometro
+        parte al primo <strong>V06N63</strong> (inizio P63) e si ferma alla Contact Light
+        (R3 &lt; 50 ft). Premi il pulsante RADAR quando inserisci manualmente
+        <strong>V57E</strong> in gioco (non rilevabile automaticamente, stesso Noun 63
+        prima e dopo). P64 (N64) e P66 (N60) vengono rilevati automaticamente.
+        Cue card P63/P64/P66 aggiornate, con profilo completo per TFI fino al touchdown.
+        Dati trascritti dalle cue card fornite — verifica sempre con l'originale in
+        caso di dubbio.
+      </p>
+
+      <div class="descent-status-row">
+        <div class="ind-shell descent-status-item">
+          <span class="tiny dim">MET UNDOCKING (CSM-LM)</span>
+          <span class="big orbit-info-val" id="descent-undocking-met">--</span>
+        </div>
+        <button class="key-btn" id="descent-undocking-btn">UNDOCKING CONFERMATO</button>
+      </div>
+
+      <div class="descent-status-row">
+        <div class="ind-shell descent-status-item">
+          <span class="tiny dim">PROGRAMMA ATTIVO</span>
+          <span class="big orbit-info-val" id="descent-program">IN ATTESA DI P63 (V06N63)</span>
+        </div>
+        <div class="ind-shell descent-status-item">
+          <span class="tiny dim">CRONOMETRO DISCESA</span>
+          <span class="big orbit-info-val" id="descent-stopwatch">00:00</span>
+        </div>
+        <div class="ind-shell descent-status-item">
+          <span class="tiny dim">MET INIZIO PDI</span>
+          <span class="big orbit-info-val" id="descent-pdi-met">--</span>
+        </div>
+        <div class="ind-shell descent-status-item">
+          <span class="tiny dim">MET CONTACT LIGHT</span>
+          <span class="big orbit-info-val" id="descent-contact-met">--</span>
+        </div>
+        <div class="ind-shell descent-status-item descent-light-item">
+          <span class="tiny dim">CONTACT LIGHT</span>
+          <div class="indicator red descent-contact-light" id="descent-contact-light">CONTACT</div>
+        </div>
+        <button class="key-btn" id="descent-radar-btn">SEGNA V57E — LANDING RADAR ON</button>
+        <button class="key-btn" id="descent-reset-btn">RESET DISCESA</button>
+      </div>
+
+      <div class="descent-layout">
+        <div class="display-box orbit-svg-wrap descent-chart-wrap">
+          <svg id="descent-svg" viewBox="0 0 640 380" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+
+        <div class="orbit-side">
+          <div class="ind-shell orbit-info">
+            <div class="tiny accent" style="margin-bottom:4px;">REGISTRI CORRENTI (LGC)</div>
+            <div class="orbit-info-row"><span class="tiny dim" id="descent-r1-label">—</span><span class="big orbit-info-val" id="descent-r1-val">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim" id="descent-r2-label">—</span><span class="big orbit-info-val" id="descent-r2-val">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim" id="descent-r3-label">—</span><span class="big orbit-info-val" id="descent-r3-val">--</span></div>
+          </div>
+          <div class="ind-shell orbit-info">
+            <div class="tiny accent" style="margin-bottom:4px;">CONFRONTO CON CUE CARD</div>
+            <div class="orbit-info-row"><span class="tiny dim">ALTITUDINE</span><span class="big orbit-info-val" id="descent-cmp-h">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">-HDOT ATTUALE</span><span class="big orbit-info-val" id="descent-cmp-hdot">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">-HDOT ATTESO</span><span class="big orbit-info-val" id="descent-cmp-hdot-exp">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">Δ -HDOT</span><span class="big orbit-info-val" id="descent-cmp-delta">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">DPS RESIDUO ATTESO</span><span class="big orbit-info-val" id="descent-cmp-dps-exp">--</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MC-6: RISALITA E RENDEZVOUS ================= -->
+  <section class="page hidden" id="page-ascent" data-title="RISALITA LUNARE E RENDEZVOUS">
+    <div class="top-bar" style="max-width:1040px;margin:12px auto 0;">
+      <span class="plate-text accent">RISALITA LUNARE E RENDEZVOUS</span>
+      <button class="back-btn" data-page="page-cat-mc">&#9668; INDIETRO A CONTROLLO MISSIONE</button>
+    </div>
+
+    <div class="panel launch-panel" style="max-width:1040px;">
+      <div class="plate"><span class="plate-text accent">TRANSIZIONE TRAIETTORIA P12</span></div>
+      <div class="orbit-info-row">
+        <span class="tiny dim">FASE</span>
+        <span class="big orbit-info-val" id="ascent-traj-badge">VERTICAL RISE PHASE (+X VERTICALE)</span>
+      </div>
+    </div>
+
+    <div class="panel launch-panel" style="max-width:1040px;">
+      <div class="descent-status-row">
+        <div class="ind-shell descent-status-item">
+          <span class="tiny dim">MET DOCKING (LM-CSM)</span>
+          <span class="big orbit-info-val" id="ascent-docking-met">--</span>
+        </div>
+        <button class="key-btn" id="ascent-docking-btn">DOCKING CONFERMATO</button>
+      </div>
+    </div>
+
+    {{ maneuver_panel("p12", "P12 — RISALITA (LGC) — MOTORE APS", false) }}
+
+    {{ maneuver_panel("rdv", "MANOVRE DI RENDEZVOUS — CSI / TPI / TPF (LGC, SPINTA RCS)", false, false) }}
+
+    <div class="panel launch-panel" style="max-width:1040px;">
+      <div class="plate"><span class="plate-text accent">P79 — AVVICINAMENTO FINALE (AGC)</span></div>
+      <div class="tiny accent" id="ascent-p79-status">P79 NON ATTIVO (attesa V37E 79E)</div>
+      <div class="tiny" id="ascent-los-status" style="margin-top:4px;">SEGNALE V16N54 — IN ATTESA DI DATI</div>
+
+      <div class="descent-status-row" style="margin-top:10px;">
+        <div class="ind-shell descent-status-item descent-light-item">
+          <span class="tiny dim">UPLINK ACTY</span>
+          <div class="indicator launch-seq-light" id="ascent-uplink-light">UPLINK</div>
+          <span class="tiny" id="ascent-uplink-note">spenta</span>
+        </div>
+        <div class="ind-shell descent-status-item">
+          <span class="tiny dim">ASSETTO (V50/V06 N18)</span>
+          <span class="big orbit-info-val" id="ascent-att-status">—</span>
+        </div>
+      </div>
+      <div class="orbit-form" style="margin-top:4px;">
+        <div class="orbit-field"><span class="tiny dim">ROLL</span><span class="big orbit-info-val" id="ascent-att-r1">--</span></div>
+        <div class="orbit-field"><span class="tiny dim">PITCH</span><span class="big orbit-info-val" id="ascent-att-r2">--</span></div>
+        <div class="orbit-field"><span class="tiny dim">YAW</span><span class="big orbit-info-val" id="ascent-att-r3">--</span></div>
+      </div>
+
+      <div class="descent-layout" style="margin-top:14px;">
+        <div class="display-box orbit-svg-wrap">
+          <svg id="ascent-prox-svg" viewBox="0 0 600 260" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+        <div class="orbit-side">
+          <div class="ind-shell orbit-info">
+            <div class="tiny accent" style="margin-bottom:4px;">V16N54 — AVVICINAMENTO LIVE</div>
+            <div class="orbit-info-row"><span class="tiny dim">RANGE (nmi)</span><span class="big orbit-info-val" id="ascent-n54-range">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">RANGE RATE (ft/s)</span><span class="big orbit-info-val" id="ascent-n54-rate">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">THETA (°)</span><span class="big orbit-info-val" id="ascent-n54-theta">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">TENDENZA</span><span class="big orbit-info-val" id="ascent-n54-trend">--</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MC-7: RIENTRO ATMOSFERICO — P61-P67 ================= -->
+  <section class="page hidden" id="page-reentry" data-title="RIENTRO ATMOSFERICO — P61-P67">
+    <div class="panel descent-panel">
+      <div class="top-bar">
+        <span class="plate-text accent">RIENTRO ATMOSFERICO — MONITOR AUTOMATICO P61-P67 (AGC)</span>
+        <button class="back-btn" data-page="page-cat-mc">&#9668; INDIETRO A CONTROLLO MISSIONE</button>
+      </div>
+
+      <p class="orbit-note">
+        Riconoscimento automatico dal Verb/Noun mostrato sul DSKY AGC. Il P61
+        (V37E 61E) fornisce il bersaglio di splashdown (N61), la predizione
+        dinamica dopo PROCEED (N60, con G max) e i dati EMS di backup (N63).
+        Il P62 gestisce la separazione CM/SM (V50N25, 00041 lampeggiante) e
+        l'assetto di rientro (N22). Il cronometro e il grafico G/Tempo partono
+        automaticamente al primo <strong>V06N64</strong> (inizio P63, attesa
+        0.05G) e proseguono in P64 (N74, guida attiva). In P67 il
+        monitoraggio di guida (bank/crossrange/downrange) resta su
+        <strong>V06N66</strong> non lampeggiante; il grafico si ferma solo
+        quando compare <strong>V16N67</strong> lampeggiante (dati finali di
+        posizione, V &lt; 1000 ft/s): a quel punto porta <strong>SC
+        CONTROL su SCS</strong> e, quando sei pronto, premi il pulsante
+        PROCEED qui sotto per segnare l'apertura dei paracadute drogue. In
+        P67 sono riconosciuti anche i display manuali richiamabili a mano
+        (V16N64E, V16N68E, V16N74E).
+      </p>
+
+      <div class="descent-status-row">
+        <div class="ind-shell descent-status-item">
+          <span class="tiny dim">PROGRAMMA ATTIVO</span>
+          <span class="big orbit-info-val" id="reentry-program">IN ATTESA DI UN PROGRAMMA P61-P67 SUL DSKY AGC</span>
+        </div>
+        <div class="ind-shell descent-status-item">
+          <span class="tiny dim">CRONOMETRO RIENTRO (DA EI/P63)</span>
+          <span class="big orbit-info-val" id="reentry-stopwatch">00:00</span>
+        </div>
+        <div class="ind-shell descent-status-item">
+          <span class="tiny dim">MET INIZIO P63</span>
+          <span class="big orbit-info-val" id="reentry-entry-met">--</span>
+        </div>
+        <div class="ind-shell descent-status-item">
+          <span class="tiny dim">MET DATI FINALI (P67)</span>
+          <span class="big orbit-info-val" id="reentry-final-met">--</span>
+        </div>
+        <div class="ind-shell descent-status-item descent-light-item">
+          <span class="tiny dim">SEPARAZIONE CM/SM</span>
+          <div class="indicator red" id="reentry-sep-light">SEP</div>
+        </div>
+        <div class="ind-shell descent-status-item descent-light-item">
+          <span class="tiny dim">DROGUE</span>
+          <div class="indicator red" id="reentry-drogue-light">DROGUE</div>
+        </div>
+        <button class="key-btn" id="reentry-drogue-btn" disabled>PROCEED — APRI PARACADUTE DROGUE</button>
+        <button class="key-btn" id="reentry-reset-btn">RESET RIENTRO</button>
+      </div>
+
+      <div class="descent-layout">
+        <div class="display-box orbit-svg-wrap descent-chart-wrap">
+          <svg id="reentry-svg" viewBox="0 0 640 380" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+
+        <div class="orbit-side">
+          <div class="ind-shell orbit-info">
+            <div class="tiny accent" style="margin-bottom:4px;">REGISTRI CORRENTI (AGC)</div>
+            <div class="orbit-info-row"><span class="tiny dim" id="reentry-r1-label">—</span><span class="big orbit-info-val" id="reentry-r1-val">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim" id="reentry-r2-label">—</span><span class="big orbit-info-val" id="reentry-r2-val">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim" id="reentry-r3-label">—</span><span class="big orbit-info-val" id="reentry-r3-val">--</span></div>
+          </div>
+          <div class="ind-shell orbit-info">
+            <div class="tiny accent" style="margin-bottom:4px;">G ATTUALE VS PREVISTO</div>
+            <div class="orbit-info-row"><span class="tiny dim">G ATTUALE</span><span class="big orbit-info-val" id="reentry-cmp-g">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">G MAX PREVISTO</span><span class="big orbit-info-val" id="reentry-cmp-gmax-exp">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">VELOCITÀ INERZIALE</span><span class="big orbit-info-val" id="reentry-cmp-v">--</span></div>
+          </div>
+          <div class="ind-shell orbit-info">
+            <div class="tiny accent" style="margin-bottom:4px;">P61 — BERSAGLIO E PREDIZIONE</div>
+            <div class="orbit-info-row"><span class="tiny dim">LAT SPLASHDOWN</span><span class="big orbit-info-val" id="reentry-pred-lat">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">LON SPLASHDOWN</span><span class="big orbit-info-val" id="reentry-pred-lon">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">CODICE ROLL</span><span class="big orbit-info-val" id="reentry-pred-roll">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">G MAX</span><span class="big orbit-info-val" id="reentry-pred-gmax">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">V PREDICTED (EI)</span><span class="big orbit-info-val" id="reentry-pred-vpred">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">GAMMA EI</span><span class="big orbit-info-val" id="reentry-pred-gamma">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">RTOGO (EMS)</span><span class="big orbit-info-val" id="reentry-pred-rtogo">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">VIO (EMS)</span><span class="big orbit-info-val" id="reentry-pred-vio">--</span></div>
+            <div class="orbit-info-row"><span class="tiny dim">TFE (EMS)</span><span class="big orbit-info-val" id="reentry-pred-tfe">--</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MC-8: REGISTRO EVENTI ================= -->
+  <section class="page hidden" id="page-log" data-title="REGISTRO EVENTI DI MISSIONE">
+    <div class="panel eventlog-panel">
+      <div class="top-bar">
+        <span class="plate-text accent">REGISTRO EVENTI — LANCIO, BURN, DISCESA, RISALITA</span>
+        <button class="back-btn" data-page="page-cat-mc">&#9668; INDIETRO A CONTROLLO MISSIONE</button>
+      </div>
+      <p class="orbit-note">
+        Ogni azione rilevante (accensioni/spegnimenti motore, inizio PDI, cambi
+        programma, Contact Light, ecc.) viene registrata automaticamente con MET
+        e dettagli. Il registro persiste navigando tra le pagine.
+      </p>
+      <div class="eventlog-toolbar">
+        <div class="eventlog-filters" id="eventlog-filters"></div>
+        <button class="key-btn" id="eventlog-export-btn">ESPORTA (.txt)</button>
+        <button class="key-btn" id="eventlog-clear-btn">SVUOTA REGISTRO</button>
+      </div>
+      <table class="eventlog-table">
+        <thead><tr><th>MET</th><th>Categoria</th><th>Descrizione</th><th>Dettagli</th><th>Ora locale</th></tr></thead>
+        <tbody id="eventlog-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+</main>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='eventlog.js') }}"></script>
+<script src="{{ url_for('static', filename='orbit.js') }}"></script>
+<script src="{{ url_for('static', filename='descent.js') }}"></script>
+<script src="{{ url_for('static', filename='reentry.js') }}"></script>
+<script src="{{ url_for('static', filename='launch.js') }}"></script>
+<script src="{{ url_for('static', filename='maneuvers.js') }}"></script>
+<script src="{{ url_for('static', filename='burns.js') }}"></script>
+<script src="{{ url_for('static', filename='ascent.js') }}"></script>
+<script src="{{ url_for('static', filename='rendezvous.js') }}"></script>
+</body>
+</html>

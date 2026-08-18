@@ -1,0 +1,37 @@
+{"seq": 1, "ts": "2026-08-12T10:16:46.812", "type": "server_start", "data": {"mission_file": "//DESKTOP-E4EV1D8/Apollo/missionTiming.json", "agc_file": "//DESKTOP-E4EV1D8/Apollo/outputAGC.json", "lgc_file": "//DESKTOP-E4EV1D8/Apollo/outputLGC.json", "destinazione_udp": "192.168.1.103:8051", "log_file": "logs\\session_20260812_101646.jsonl"}}
+{"seq": 2, "ts": "2026-08-12T10:23:31.878", "type": "mission_event", "data": {"id": 1, "category": "SISTEMA", "description": "Registro eventi inizializzato", "details": "", "met": "+000:00:00", "wallClock": "10:23:31"}}
+{"seq": 3, "ts": "2026-08-12T10:24:32.559", "type": "macro_step", "data": {"macro": "rndz", "line": "--- INIZIO SEQUENZA AUTOMATICA CONFIGURAZIONE RENDEZ-VOUS ---"}}
+{"seq": 4, "ts": "2026-08-12T10:24:32.585", "type": "macro_step", "data": {"macro": "rndz", "line": "⚙️ Retract Probe off (Retract -> Middle)"}}
+{"seq": 5, "ts": "2026-08-12T10:24:32.702", "type": "switch_sent", "data": {"switch_id": 238, "position": 2}}
+{"seq": 6, "ts": "2026-08-12T10:24:33.230", "type": "macro_step", "data": {"macro": "rndz", "line": "💡 Attivazione luci Rendezvous (ExtLightRNDZ -> DOWN)"}}
+{"seq": 7, "ts": "2026-08-12T10:24:33.360", "type": "switch_sent", "data": {"switch_id": 241, "position": 5}}
+{"seq": 8, "ts": "2026-08-12T10:24:33.377", "type": "macro_step", "data": {"macro": "rndz", "line": "💡 Attivazione luci Rendezvous (ExtLightRUNEVA -> UP)"}}
+{"seq": 9, "ts": "2026-08-12T10:24:33.493", "type": "switch_sent", "data": {"switch_id": 240, "position": 4}}
+{"seq": 10, "ts": "2026-08-12T10:24:33.511", "type": "macro_step", "data": {"macro": "rndz", "line": "💡 Attivazione Docking Probe (DockingProbe -> UP)"}}
+{"seq": 11, "ts": "2026-08-12T10:24:33.635", "type": "switch_sent", "data": {"switch_id": 237, "position": 4}}
+{"seq": 12, "ts": "2026-08-12T10:24:33.652", "type": "macro_step", "data": {"macro": "rndz", "line": "💡 Attivazione EMS (Switch -> Backup/VHF)"}}
+{"seq": 13, "ts": "2026-08-12T10:24:33.769", "type": "switch_sent", "data": {"switch_id": 145, "position": 5}}
+{"seq": 14, "ts": "2026-08-12T10:24:33.785", "type": "macro_step", "data": {"macro": "rndz", "line": "--- OPERAZIONE COMPLETATA CON SUCCESSO ---"}}
+{"seq": 15, "ts": "2026-08-12T10:24:40.077", "type": "macro_step", "data": {"macro": "rndz", "line": "--- INIZIO SEQUENZA AUTOMATICA CONFIGURAZIONE RENDEZ-VOUS ---"}}
+{"seq": 16, "ts": "2026-08-12T10:24:40.114", "type": "macro_step", "data": {"macro": "rndz", "line": "⚙️ Retract Probe off (Retract -> Middle)"}}
+{"seq": 17, "ts": "2026-08-12T10:24:40.236", "type": "switch_sent", "data": {"switch_id": 238, "position": 2}}
+{"seq": 18, "ts": "2026-08-12T10:24:40.762", "type": "macro_step", "data": {"macro": "rndz", "line": "💡 Attivazione luci Rendezvous (ExtLightRNDZ -> DOWN)"}}
+{"seq": 19, "ts": "2026-08-12T10:24:40.885", "type": "switch_sent", "data": {"switch_id": 241, "position": 5}}
+{"seq": 20, "ts": "2026-08-12T10:24:40.909", "type": "macro_step", "data": {"macro": "rndz", "line": "💡 Attivazione luci Rendezvous (ExtLightRUNEVA -> UP)"}}
+{"seq": 21, "ts": "2026-08-12T10:24:41.027", "type": "switch_sent", "data": {"switch_id": 240, "position": 4}}
+{"seq": 22, "ts": "2026-08-12T10:24:41.053", "type": "macro_step", "data": {"macro": "rndz", "line": "💡 Attivazione Docking Probe (DockingProbe -> UP)"}}
+{"seq": 23, "ts": "2026-08-12T10:24:41.184", "type": "switch_sent", "data": {"switch_id": 237, "position": 4}}
+{"seq": 24, "ts": "2026-08-12T10:24:41.209", "type": "macro_step", "data": {"macro": "rndz", "line": "💡 Attivazione EMS (Switch -> Backup/VHF)"}}
+{"seq": 25, "ts": "2026-08-12T10:24:41.328", "type": "switch_sent", "data": {"switch_id": 145, "position": 5}}
+{"seq": 26, "ts": "2026-08-12T10:24:41.354", "type": "macro_step", "data": {"macro": "rndz", "line": "--- OPERAZIONE COMPLETATA CON SUCCESSO ---"}}
+{"seq": 27, "ts": "2026-08-12T10:24:44.864", "type": "macro_step", "data": {"macro": "sys2", "line": "--- INIZIO PROCEDURA AUTOMATICA POST-DOCKING ---"}}
+{"seq": 28, "ts": "2026-08-12T10:24:44.895", "type": "macro_step", "data": {"macro": "sys2", "line": "⚙️ Retracting Scopes (Retract -> UP)"}}
+{"seq": 29, "ts": "2026-08-12T10:24:45.036", "type": "switch_sent", "data": {"switch_id": 238, "position": 4}}
+{"seq": 30, "ts": "2026-08-12T10:24:45.564", "type": "macro_step", "data": {"macro": "sys2", "line": "💡 Retract Docking Probe (DockingProbe -> Down)"}}
+{"seq": 31, "ts": "2026-08-12T10:24:45.689", "type": "switch_sent", "data": {"switch_id": 237, "position": 5}}
+{"seq": 32, "ts": "2026-08-12T10:24:45.712", "type": "macro_step", "data": {"macro": "sys2", "line": "💡 Spegnimento luci Rendezvous (ExtLightRNDZ -> Middle)"}}
+{"seq": 33, "ts": "2026-08-12T10:24:45.830", "type": "switch_sent", "data": {"switch_id": 241, "position": 2}}
+{"seq": 34, "ts": "2026-08-12T10:24:45.854", "type": "macro_step", "data": {"macro": "sys2", "line": "💡 Attivazione luci Rendezvous (ExtLightRUNEVA -> UP)"}}
+{"seq": 35, "ts": "2026-08-12T10:24:45.976", "type": "switch_sent", "data": {"switch_id": 240, "position": 5}}
+{"seq": 36, "ts": "2026-08-12T10:24:45.998", "type": "macro_step", "data": {"macro": "sys2", "line": "--- OPERAZIONE COMPLETATA CON SUCCESSO ---"}}
+{"seq": 37, "ts": "2026-08-12T17:08:15.042", "type": "mission_event", "data": {"id": 2, "category": "DISCESA", "description": "Undocking confermato — LM sganciato dal CSM", "details": "MET=+002:11:19", "met": "+002:11:19", "wallClock": "17:08:15"}}
